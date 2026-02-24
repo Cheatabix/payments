@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BuyBye (Free) – Time-to-Earn Calculator (GBP)</title>
+  <meta name="theme-color" content="#111111" />
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#12141c; --muted:#a8b0c3; --text:#eef1ff;
+      --line:#202535; --accent:#7c5cff; --good:#34d399; --bad:#fb7185;
+      --warn:#fbbf24;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 800px at 20% -20%, rgba(124,92,255,.22), transparent 60%),
+                  radial-gradient(1000px 600px at 110% 10%, rgba(52,211,153,.12), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    a{color:inherit}
+    .wrap{max-width:980px; margin:0 auto; padding:22px}
+    header{display:flex; gap:14px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap}
+    h1{margin:0; font-size:20px; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:13px; margin-top:6px; line-height:1.35}
+    .grid{display:grid; grid-template-columns: 1fr; gap:14px; margin-top:16px}
+    @media (min-width: 900px){ .grid{grid-template-columns: 360px 1fr} }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      padding:14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .card h2{margin:0 0 10px; font-size:14px; color:#dfe4ff}
+    label{display:block; font-size:12px; color:var(--muted); margin-top:10px}
+    input, select, button, textarea{
+      width:100%; margin-top:6px;
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus{border-color:rgba(124,92,255,.7)}
+    .row{display:flex; gap:10px}
+    .row > *{flex:1}
+    .btn{
+      cursor:pointer; background: rgba(124,92,255,.18);
+      border-color: rgba(124,92,255,.45);
+      transition: transform .05s ease, background .15s ease;
+      font-weight: 650;
+    }
+    .btn:hover{background: rgba(124,92,255,.26)}
+    .btn:active{transform: translateY(1px)}
+    .btn2{
+      cursor:pointer; background: rgba(52,211,153,.12);
+      border-color: rgba(52,211,153,.30);
+      font-weight:650;
+    }
+    .btn2:hover{background: rgba(52,211,153,.18)}
+    .btnDanger{
+      cursor:pointer; background: rgba(251,113,133,.10);
+      border-color: rgba(251,113,133,.25);
+      font-weight:650;
+    }
+    .btnDanger:hover{background: rgba(251,113,133,.14)}
+    .pill{
+      display:inline-flex; gap:8px; align-items:center;
+      border:1px solid var(--line);
+      padding:6px 10px; border-radius:999px;
+      font-size:12px; color:var(--muted);
+      background: rgba(255,255,255,.03);
+    }
+    .kpis{display:flex; flex-wrap:wrap; gap:10px}
+    .kpi{
+      flex:1; min-width: 220px;
+      background: rgba(255,255,255,.03);
+      border:1px solid var(--line);
+      padding:10px; border-radius: 14px;
+    }
+    .kpi .big{font-size:18px; font-weight:800; letter-spacing:.2px}
+    .kpi .small{font-size:12px; color:var(--muted); margin-top:2px}
+    .muted{color:var(--muted)}
+    .split{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      margin-top:8px;
+    }
+    table{width:100%; border-collapse:collapse; margin-top:10px}
+    th, td{border-bottom:1px solid rgba(255,255,255,.06); padding:10px 6px; font-size:13px}
+    th{text-align:left; color:#dfe4ff; font-size:12px; font-weight:700}
+    td{color:#e9edff}
+    .tag{
+      font-size:11px; color:var(--muted);
+      border:1px solid rgba(255,255,255,.08);
+      padding:4px 8px; border-radius:999px;
+      display:inline-block;
+    }
+    .right{text-align:right}
+    .good{color:var(--good); font-weight:700}
+    .bad{color:var(--bad); font-weight:700}
+    .warn{color:var(--warn); font-weight:700}
+    .tiny{font-size:12px}
+    .hr{height:1px; background:rgba(255,255,255,.07); margin:12px 0}
+    .twoCols{display:grid; grid-template-columns:1fr; gap:12px}
+    @media(min-width:700px){ .twoCols{grid-template-columns:1fr 1fr} }
+    .note{font-size:12px; color:var(--muted); line-height:1.35}
+    .footer{margin-top:16px; font-size:12px; color:var(--muted)}
+    .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>BuyBye (Free) — “How long did this cost me?” (GBP)</h1>
+        <div class="sub">
+          Enter your income + expenses + savings rate, then add items. It shows <b>work time</b>, <b>calendar time</b>,
+          and <b>opportunity cost</b>. Data stays on your device (localStorage).
+        </div>
+      </div>
+      <div class="chips">
+        <span class="pill">£ GBP</span>
+        <span class="pill">Works offline after first load</span>
+        <span class="pill">Add to Home Screen</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: SETTINGS + ADD ITEM -->
+      <div class="card">
+        <h2>1) Your money settings</h2>
+
+        <label>Net pay method</label>
+        <select id="netMethod">
+          <option value="netAnnual">I know my net annual pay</option>
+          <option value="grossTakehome">I know gross annual + take-home %</option>
+          <option value="netMonthly">I know my net monthly pay</option>
+        </select>
+
+        <div id="netAnnualBox">
+          <label>Net annual pay (£)</label>
+          <input id="netAnnual" type="number" min="0" step="100" value="30000" />
+        </div>
+
+        <div id="grossTakehomeBox" style="display:none">
+          <div class="row">
+            <div>
+              <label>Gross annual (£)</label>
+              <input id="grossAnnual" type="number" min="0" step="100" value="35000" />
+            </div>
+            <div>
+              <label>Take-home % (after tax)</label>
+              <input id="takehomePct" type="number" min="1" max="100" step="1" value="75" />
+            </div>
+          </div>
+          <div class="note" style="margin-top:6px">
+            Tip: use your payslip/net salary for accuracy (tax bands change). This tool can work purely from your net.
+          </div>
+        </div>
+
+        <div id="netMonthlyBox" style="display:none">
+          <label>Net monthly pay (£)</label>
+          <input id="netMonthly" type="number" min="0" step="50" value="2500" />
+        </div>
+
+        <div class="twoCols">
+          <div>
+            <label>Work hours per week</label>
+            <input id="hoursWeek" type="number" min="1" step="1" value="40" />
+          </div>
+          <div>
+            <label>Work days per week</label>
+            <input id="daysWeek" type="number" min="1" max="7" step="1" value="5" />
+          </div>
+        </div>
+
+        <div class="twoCols">
+          <div>
+            <label>Hours per work day (for “days”)</label>
+            <input id="hoursDay" type="number" min="1" step="0.5" value="8" />
+          </div>
+          <div>
+            <label>How much of net pay can you save? (%)</label>
+            <input id="saveRate" type="number" min="0" max="100" step="1" value="20" />
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <h2>2) Recurring expenses (optional, but makes it “full match”)</h2>
+        <div class="note">Add monthly fixed costs (rent, bills, subscriptions). This reduces what’s left to save.</div>
+
+        <div class="row" style="margin-top:10px">
+          <input id="expName" placeholder="Expense name (e.g., Rent)" />
+          <input id="expAmount" type="number" min="0" step="1" placeholder="£ / month" />
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn2" id="addExpenseBtn">Add expense</button>
+          <button class="btnDanger" id="clearExpensesBtn">Clear expenses</button>
+        </div>
+
+        <div id="expenseList" class="note" style="margin-top:10px"></div>
+
+        <div class="hr"></div>
+
+        <h2>3) Add an item</h2>
+        <label>Item name</label>
+        <input id="itemName" placeholder="e.g., AirPods" />
+
+        <div class="twoCols">
+          <div>
+            <label>Price (£)</label>
+            <input id="itemPrice" type="number" min="0" step="0.01" placeholder="299" />
+          </div>
+          <div>
+            <label>Category</label>
+            <select id="itemCategory">
+              <option>Tech</option>
+              <option>Food & Drink</option>
+              <option>Fashion</option>
+              <option>Home</option>
+              <option>Travel</option>
+              <option>Subscriptions</option>
+              <option>Gaming</option>
+              <option>Fitness</option>
+              <option>Gifts</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="twoCols">
+          <div>
+            <label>Type</label>
+            <select id="itemType">
+              <option value="oneoff">One-off</option>
+              <option value="monthly">Monthly recurring</option>
+              <option value="yearly">Yearly recurring</option>
+            </select>
+          </div>
+          <div>
+            <label>Notes (optional)</label>
+            <input id="itemNotes" placeholder="e.g., Needed for work" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="addItemBtn">Add item</button>
+          <button class="btnDanger" id="clearItemsBtn">Clear items</button>
+        </div>
+
+        <div class="footer">
+          Install: open in Safari/Chrome → Share/Menu → <b>Add to Home Screen</b>.
+        </div>
+      </div>
+
+      <!-- RIGHT: DASHBOARD -->
+      <div class="card">
+        <h2>Your dashboard</h2>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="hr"></div>
+
+        <div class="split">
+          <div>
+            <div class="muted tiny">Sort</div>
+            <select id="sortBy">
+              <option value="recent">Most recent</option>
+              <option value="priceDesc">Price (high → low)</option>
+              <option value="priceAsc">Price (low → high)</option>
+              <option value="timeDesc">Time to earn (high → low)</option>
+              <option value="timeAsc">Time to earn (low → high)</option>
+            </select>
+          </div>
+          <div>
+            <div class="muted tiny">Filter category</div>
+            <select id="filterCat">
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <div class="muted tiny">Search</div>
+            <input id="search" placeholder="Search items…" />
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th class="right">Price</th>
+              <th class="right">Work time</th>
+              <th class="right">Calendar time (saving)</th>
+              <th class="right">Cost rating</th>
+              <th class="right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTbody"></tbody>
+        </table>
+
+        <div class="hr"></div>
+
+        <h2>Opportunity cost (quick comparisons)</h2>
+        <div class="note">
+          This converts an item into “how many of your common monthly costs” it equals.
+          Add your recurring expenses on the left to make this useful.
+        </div>
+        <div id="oppCost" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* =========================
+   Data + Storage
+========================= */
+const STORE_KEY = "buybye_free_gbp_v1";
+
+const defaultState = {
+  settings: {
+    netMethod: "netAnnual",
+    netAnnual: 30000,
+    grossAnnual: 35000,
+    takehomePct: 75,
+    netMonthly: 2500,
+    hoursWeek: 40,
+    daysWeek: 5,
+    hoursDay: 8,
+    saveRate: 20
+  },
+  expenses: [
+    // { id, name, amountMonthly }
+  ],
+  items: [
+    // { id, name, price, category, type, notes, createdAt }
+  ]
+};
+
+let state = loadState();
+
+/* =========================
+   Helpers
+========================= */
+const £ = new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP" });
+
+function uid(){ return Math.random().toString(16).slice(2) + Date.now().toString(16); }
+
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return structuredClone(defaultState);
+    const parsed = JSON.parse(raw);
+    // basic merge safety
+    return {
+      settings: { ...defaultState.settings, ...(parsed.settings||{}) },
+      expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+      items: Array.isArray(parsed.items) ? parsed.items : []
+    };
+  }catch{
+    return structuredClone(defaultState);
+  }
+}
+function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+function getNetAnnual(){
+  const s = state.settings;
+  if(s.netMethod === "netAnnual") return Math.max(0, +s.netAnnual || 0);
+  if(s.netMethod === "netMonthly") return Math.max(0, (+s.netMonthly || 0) * 12);
+  // grossTakehome
+  const gross = Math.max(0, +s.grossAnnual || 0);
+  const pct = clamp((+s.takehomePct || 0)/100, 0, 1);
+  return gross * pct;
+}
+
+function sumMonthlyExpenses(){
+  return state.expenses.reduce((a,e)=> a + (Number(e.amountMonthly)||0), 0);
+}
+
+function hourlyNet(){
+  const net = getNetAnnual();
+  const hoursWeek = Math.max(1, +state.settings.hoursWeek || 40);
+  return net / (52 * hoursWeek);
+}
+
+function dailyNet(){
+  const hoursDay = Math.max(1, +state.settings.hoursDay || 8);
+  return hourlyNet() * hoursDay;
+}
+
+function monthlyNet(){
+  return getNetAnnual() / 12;
+}
+
+function monthlySaveCapacity(){
+  // Start with net monthly * saveRate, then subtract fixed expenses
+  const saveRate = clamp((+state.settings.saveRate||0)/100, 0, 1);
+  const base = monthlyNet() * saveRate;
+  const leftover = base - sumMonthlyExpenses();
+  return Math.max(0, leftover);
+}
+
+function formatHoursToHMM(hours){
+  if(!isFinite(hours) || hours <= 0) return "—";
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h ${m}m`;
+}
+
+function formatDays(days){
+  if(!isFinite(days) || days <= 0) return "—";
+  return `${(Math.round(days*10)/10).toLocaleString()}d`;
+}
+
+function formatWeeks(weeks){
+  if(!isFinite(weeks) || weeks <= 0) return "—";
+  return `${(Math.round(weeks*10)/10).toLocaleString()}w`;
+}
+
+function costRating(hoursToEarn){
+  // A simple relative scale based on weekly hours
+  const hw = Math.max(1, +state.settings.hoursWeek || 40);
+  const weeks = hoursToEarn / hw;
+  if(weeks < 0.25) return { label:"Small", cls:"good" };        // < ~1–2 days
+  if(weeks < 1)    return { label:"Medium", cls:"warn" };       // < 1 week
+  if(weeks < 4)    return { label:"Big", cls:"bad" };           // < 1 month
+  return           { label:"Huge", cls:"bad" };
+}
+
+function itemEffectivePriceMonthly(item){
+  // For recurring items, show monthly equivalent
+  const p = Number(item.price)||0;
+  if(item.type === "monthly") return p;
+  if(item.type === "yearly") return p/12;
+  return p; // one-off treated as one-off elsewhere
+}
+
+/* =========================
+   UI bindings
+========================= */
+const el = (id)=>document.getElementById(id);
+
+function syncSettingsToUI(){
+  const s = state.settings;
+  el("netMethod").value = s.netMethod;
+
+  el("netAnnual").value = s.netAnnual;
+  el("grossAnnual").value = s.grossAnnual;
+  el("takehomePct").value = s.takehomePct;
+  el("netMonthly").value = s.netMonthly;
+
+  el("hoursWeek").value = s.hoursWeek;
+  el("daysWeek").value = s.daysWeek;
+  el("hoursDay").value = s.hoursDay;
+  el("saveRate").value = s.saveRate;
+
+  el("netAnnualBox").style.display = (s.netMethod==="netAnnual") ? "" : "none";
+  el("grossTakehomeBox").style.display = (s.netMethod==="grossTakehome") ? "" : "none";
+  el("netMonthlyBox").style.display = (s.netMethod==="netMonthly") ? "" : "none";
+}
+
+function readSettingsFromUI(){
+  state.settings.netMethod = el("netMethod").value;
+
+  state.settings.netAnnual = Number(el("netAnnual").value)||0;
+  state.settings.grossAnnual = Number(el("grossAnnual").value)||0;
+  state.settings.takehomePct = Number(el("takehomePct").value)||0;
+  state.settings.netMonthly = Number(el("netMonthly").value)||0;
+
+  state.settings.hoursWeek = Number(el("hoursWeek").value)||40;
+  state.settings.daysWeek = Number(el("daysWeek").value)||5;
+  state.settings.hoursDay = Number(el("hoursDay").value)||8;
+  state.settings.saveRate = Number(el("saveRate").value)||0;
+
+  saveState();
+  render();
+}
+
+function renderExpenses(){
+  if(state.expenses.length === 0){
+    el("expenseList").innerHTML = `<span class="muted">No recurring expenses added.</span>`;
+    return;
+  }
+  const lines = state.expenses
+    .map(e => `• ${escapeHtml(e.name)} — <b>${£.format(e.amountMonthly)}</b>/mo <span class="muted">(id: ${e.id.slice(-6)})</span>`)
+    .join("<br/>");
+  el("expenseList").innerHTML = lines + `<div class="note" style="margin-top:8px">To remove one expense: click it below in “Opportunity cost”.</div>`;
+}
+
+function renderKpis(){
+  const netA = getNetAnnual();
+  const hNet = hourlyNet();
+  const dNet = dailyNet();
+  const mNet = monthlyNet();
+  const expM = sumMonthlyExpenses();
+  const saveM = monthlySaveCapacity();
+
+  const hw = Math.max(1, +state.settings.hoursWeek || 40);
+  const hoursYear = 52 * hw;
+
+  const text = `
+    <div class="kpi">
+      <div class="big">${£.format(netA)}</div>
+      <div class="small">Net annual pay used for calculations</div>
+    </div>
+    <div class="kpi">
+      <div class="big">${£.format(hNet)} / hour</div>
+      <div class="small">Take-home per work hour (net)</div>
+    </div>
+    <div class="kpi">
+      <div class="big">${£.format(mNet)} / month</div>
+      <div class="small">Net monthly pay</div>
+    </div>
+    <div class="kpi">
+      <div class="big">${£.format(expM)} / month</div>
+      <div class="small">Recurring expenses (you added)</div>
+    </div>
+    <div class="kpi">
+      <div class="big">${£.format(saveM)} / month</div>
+      <div class="small">Estimated monthly saving capacity (after expenses)</div>
+    </div>
+    <div class="kpi">
+      <div class="big">${hoursYear.toLocaleString()} hrs/year</div>
+      <div class="small">Work hours per year (based on your hours/week)</div>
+    </div>
+  `;
+  el("kpis").innerHTML = text;
+}
+
+function currentFilters(){
+  return {
+    sortBy: el("sortBy").value,
+    filterCat: el("filterCat").value,
+    search: (el("search").value||"").trim().toLowerCase()
+  };
+}
+
+function sortItems(items, sortBy){
+  const hNet = hourlyNet();
+  const hw = Math.max(1, +state.settings.hoursWeek || 40);
+
+  const timeHours = (it)=>{
+    const p = Number(it.price)||0;
+    if(hNet<=0) return Infinity;
+    return p / hNet;
+  };
+
+  const copy = items.slice();
+  if(sortBy==="recent"){
+    copy.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }else if(sortBy==="priceDesc"){
+    copy.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0));
+  }else if(sortBy==="priceAsc"){
+    copy.sort((a,b)=>(Number(a.price)||0)-(Number(b.price)||0));
+  }else if(sortBy==="timeDesc"){
+    copy.sort((a,b)=>timeHours(b)-timeHours(a));
+  }else if(sortBy==="timeAsc"){
+    copy.sort((a,b)=>timeHours(a)-timeHours(b));
+  }
+  return copy;
+}
+
+function renderItems(){
+  const hNet = hourlyNet();
+  const dNet = dailyNet();
+  const hw = Math.max(1, +state.settings.hoursWeek || 40);
+
+  const saveM = monthlySaveCapacity();
+
+  const { sortBy, filterCat, search } = currentFilters();
+
+  let list = state.items.slice();
+
+  if(filterCat !== "all"){
+    list = list.filter(it => it.category === filterCat);
+  }
+  if(search){
+    list = list.filter(it => (
+      (it.name||"").toLowerCase().includes(search) ||
+      (it.notes||"").toLowerCase().includes(search) ||
+      (it.category||"").toLowerCase().includes(search)
+    ));
+  }
+
+  list = sortItems(list, sortBy);
+
+  // Populate filter cats from existing items
+  const cats = Array.from(new Set(state.items.map(i=>i.category))).filter(Boolean).sort();
+  const sel = el("filterCat").value;
+  el("filterCat").innerHTML = `<option value="all">All</option>` + cats.map(c=>`<option>${escapeHtml(c)}</option>`).join("");
+  el("filterCat").value = cats.includes(sel) ? sel : "all";
+
+  if(list.length === 0){
+    el("itemsTbody").innerHTML = `<tr><td colspan="6" class="muted">No items yet. Add one on the left.</td></tr>`;
+    return;
+  }
+
+  const rows = list.map(it=>{
+    const price = Number(it.price)||0;
+
+    // Work time (earn time)
+    const hrs = (hNet>0) ? (price / hNet) : Infinity;
+    const days = (dNet>0) ? (price / dNet) : Infinity;
+    const weeks = (hw>0 && isFinite(hrs)) ? (hrs / hw) : Infinity;
+
+    const workTime = isFinite(hrs) ? `${formatHoursToHMM(hrs)} <span class="muted">(${formatDays(days)}, ${formatWeeks(weeks)})</span>` : "—";
+
+    // Calendar time if saving
+    // For one-off: months = price / monthlySaveCapacity
+    // For monthly recurring: compare to monthly save capacity (stress test)
+    // For yearly recurring: compare to monthly save capacity too, but price/12 for monthly impact + one-off for annual renewal
+    let cal = "—";
+    if(saveM > 0){
+      if(it.type === "oneoff"){
+        const months = price / saveM;
+        cal = `${(Math.round(months*10)/10).toLocaleString()} mo`;
+      }else if(it.type === "monthly"){
+        const ratio = price / saveM; // "this subscription eats X of your saving capacity"
+        cal = `${(Math.round(ratio*100)/100).toLocaleString()}× of your monthly saving`;
+      }else if(it.type === "yearly"){
+        const months = price / saveM;
+        cal = `${(Math.round(months*10)/10).toLocaleString()} mo (to cover annual)`;
+      }
+    }else{
+      cal = `<span class="bad">No saving capacity set</span>`;
+    }
+
+    const r = costRating(hrs);
+
+    const typeTag = it.type === "oneoff" ? "One-off" : (it.type === "monthly" ? "Monthly" : "Yearly");
+    const desc = `
+      <div style="font-weight:800">${escapeHtml(it.name||"Item")}</div>
+      <div class="muted tiny">${escapeHtml(it.category||"Other")} • <span class="tag">${typeTag}</span>${it.notes?` • ${escapeHtml(it.notes)}`:""}</div>
+    `;
+
+    return `
+      <tr>
+        <td>${desc}</td>
+        <td class="right">${£.format(price)}</td>
+        <td class="right">${workTime}</td>
+        <td class="right">${cal}</td>
+        <td class="right"><span class="${r.cls}">${r.label}</span></td>
+        <td class="right"><button class="btnDanger" data-del="${it.id}">Delete</button></td>
+      </tr>
+    `;
+  }).join("");
+
+  el("itemsTbody").innerHTML = rows;
+
+  // wire delete buttons
+  el("itemsTbody").querySelectorAll("button[data-del]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-del");
+      state.items = state.items.filter(i=>i.id !== id);
+      saveState();
+      render();
+    });
+  });
+}
+
+function renderOpportunityCost(){
+  const exp = state.expenses.slice().sort((a,b)=>(Number(b.amountMonthly)||0)-(Number(a.amountMonthly)||0));
+  if(exp.length === 0){
+    el("oppCost").innerHTML = `<div class="muted">Add some monthly expenses on the left (rent, bills, subscriptions) to see comparisons.</div>`;
+    return;
+  }
+
+  // Use the most expensive recent/visible item as the comparison target, otherwise newest item
+  const { filterCat, search } = currentFilters();
+  let items = state.items.slice();
+  if(filterCat !== "all") items = items.filter(it=>it.category===filterCat);
+  if(search) items = items.filter(it => ((it.name||"").toLowerCase().includes(search) || (it.notes||"").toLowerCase().includes(search)));
+  items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const target = items[0] || state.items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
+
+  if(!target){
+    el("oppCost").innerHTML = `<div class="muted">Add at least one item to see opportunity cost comparisons.</div>`;
+    return;
+  }
+
+  const targetPrice = Number(target.price)||0;
+  const lines = exp.map(e=>{
+    const amt = Number(e.amountMonthly)||0;
+    if(amt <= 0) return "";
+    const x = targetPrice / amt;
+    return `
+      <div class="split" style="margin:8px 0">
+        <div>
+          <b>${escapeHtml(e.name)}</b> <span class="muted">(${£.format(amt)}/mo)</span>
+          <div class="muted tiny">Click to remove expense</div>
+        </div>
+        <div class="right">
+          <div><b>${(Math.round(x*10)/10).toLocaleString()}</b> months of this expense</div>
+        </div>
+        <div class="right" style="min-width:110px">
+          <button class="btnDanger" data-expdel="${e.id}">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  el("oppCost").innerHTML = `
+    <div class="note">
+      Comparing <b>${escapeHtml(target.name)}</b> (${£.format(targetPrice)}) to your monthly expenses:
+    </div>
+    <div style="margin-top:10px">${lines || "<span class='muted'>No valid expense amounts.</span>"}</div>
+  `;
+
+  el("oppCost").querySelectorAll("button[data-expdel]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-expdel");
+      state.expenses = state.expenses.filter(e=>e.id !== id);
+      saveState();
+      render();
+    });
+  });
+}
+
+function escapeHtml(s){
+  return String(s||"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+/* =========================
+   Actions
+========================= */
+function addItem(){
+  const name = (el("itemName").value||"").trim();
+  const price = Number(el("itemPrice").value||0);
+  const category = el("itemCategory").value;
+  const type = el("itemType").value;
+  const notes = (el("itemNotes").value||"").trim();
+
+  if(!name || !isFinite(price) || price <= 0){
+    alert("Please enter an item name and a valid price.");
+    return;
+  }
+  state.items.unshift({
+    id: uid(),
+    name,
+    price,
+    category,
+    type,
+    notes,
+    createdAt: Date.now()
+  });
+  el("itemName").value = "";
+  el("itemPrice").value = "";
+  el("itemNotes").value = "";
+  saveState();
+  render();
+}
+
+function addExpense(){
+  const name = (el("expName").value||"").trim();
+  const amt = Number(el("expAmount").value||0);
+  if(!name || !isFinite(amt) || amt <= 0){
+    alert("Enter an expense name and a valid monthly amount.");
+    return;
+  }
+  state.expenses.unshift({ id: uid(), name, amountMonthly: amt });
+  el("expName").value = "";
+  el("expAmount").value = "";
+  saveState();
+  render();
+}
+
+/* =========================
+   Render
+========================= */
+function render(){
+  syncSettingsToUI();
+  renderExpenses();
+  renderKpis();
+  renderItems();
+  renderOpportunityCost();
+}
+
+/* =========================
+   Wire events
+========================= */
+["netMethod","netAnnual","grossAnnual","takehomePct","netMonthly","hoursWeek","daysWeek","hoursDay","saveRate"].forEach(id=>{
+  el(id).addEventListener("input", readSettingsFromUI);
+  el(id).addEventListener("change", readSettingsFromUI);
+});
+
+el("addItemBtn").addEventListener("click", addItem);
+el("clearItemsBtn").addEventListener("click", ()=>{
+  if(confirm("Clear ALL items?")){ state.items = []; saveState(); render(); }
+});
+
+el("addExpenseBtn").addEventListener("click", addExpense);
+el("clearExpensesBtn").addEventListener("click", ()=>{
+  if(confirm("Clear ALL expenses?")){ state.expenses = []; saveState(); render(); }
+});
+
+["sortBy","filterCat","search"].forEach(id=>{
+  el(id).addEventListener("input", render);
+  el(id).addEventListener("change", render);
+});
+
+// enter-to-add UX
+el("itemPrice").addEventListener("keydown", (e)=>{ if(e.key==="Enter") addItem(); });
+el("expAmount").addEventListener("keydown", (e)=>{ if(e.key==="Enter") addExpense(); });
+
+/* =========================
+   Boot
+========================= */
+render();
+</script>
+</body>
+</html>
