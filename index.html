@@ -322,6 +322,17 @@
 ========================= */
 const STORE_KEY = "buybye_free_gbp_v1";
 
+// --- Compatibility helpers (Safari-safe) ---
+function deepClone(obj){
+  // structuredClone isn't available on some Safari/iOS versions
+  if (typeof structuredClone === "function") return structuredClone(obj);
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function safeReplaceAll(str, find, replace){
+  return String(str).split(find).join(replace);
+}  
+
 const defaultState = {
   settings: {
     netMethod: "netAnnual",
@@ -356,7 +367,7 @@ function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 function loadState(){
   try{
     const raw = localStorage.getItem(STORE_KEY);
-    if(!raw) return structuredClone(defaultState);
+    if(!raw) return deepClone(defaultState);
     const parsed = JSON.parse(raw);
     // basic merge safety
     return {
@@ -365,7 +376,7 @@ function loadState(){
       items: Array.isArray(parsed.items) ? parsed.items : []
     };
   }catch{
-    return structuredClone(defaultState);
+    return deepClone(defaultState);
   }
 }
 function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
@@ -725,12 +736,13 @@ function renderOpportunityCost(){
 }
 
 function escapeHtml(s){
-  return String(s||"")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+  let out = String(s || "");
+  out = out.split("&").join("&amp;");
+  out = out.split("<").join("&lt;");
+  out = out.split(">").join("&gt;");
+  out = out.split('"').join("&quot;");
+  out = out.split("'").join("&#039;");
+  return out;
 }
 
 /* =========================
@@ -822,3 +834,4 @@ render();
 </script>
 </body>
 </html>
+
