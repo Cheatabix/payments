@@ -317,521 +317,321 @@
   </div>
 
 <script>
-/* =========================
-   Data + Storage
-========================= */
-const STORE_KEY = "buybye_free_gbp_v1";
+(function(){
+  // If anything breaks, show it (so we don't get "buttons do nothing")
+  window.addEventListener("error", function(e){
+    alert("JS error: " + (e.message || "unknown") + "\nLine: " + (e.lineno || "?"));
+  });
 
-// --- Compatibility helpers (Safari-safe) ---
-function deepClone(obj){
-  // structuredClone isn't available on some Safari/iOS versions
-  if (typeof structuredClone === "function") return structuredClone(obj);
-  return JSON.parse(JSON.stringify(obj));
-}
+  function $(id){ return document.getElementById(id); }
+  function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-function safeReplaceAll(str, find, replace){
-  return String(str).split(find).join(replace);
-}  
-
-const defaultState = {
-  settings: {
-    netMethod: "netAnnual",
-    netAnnual: 30000,
-    grossAnnual: 35000,
-    takehomePct: 75,
-    netMonthly: 2500,
-    hoursWeek: 40,
-    daysWeek: 5,
-    hoursDay: 8,
-    saveRate: 20
-  },
-  expenses: [
-    // { id, name, amountMonthly }
-  ],
-  items: [
-    // { id, name, price, category, type, notes, createdAt }
-  ]
-};
-
-let state = loadState();
-
-/* =========================
-   Helpers
-========================= */
-const £ = new Intl.NumberFormat(undefined, { style: "currency", currency: "GBP" });
-
-function uid(){ return Math.random().toString(16).slice(2) + Date.now().toString(16); }
-
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORE_KEY);
-    if(!raw) return deepClone(defaultState);
-    const parsed = JSON.parse(raw);
-    // basic merge safety
-    return {
-      settings: { ...defaultState.settings, ...(parsed.settings||{}) },
-      expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
-      items: Array.isArray(parsed.items) ? parsed.items : []
-    };
-  }catch{
-    return deepClone(defaultState);
+  function escapeHtml(s){
+    var out = String(s || "");
+    out = out.split("&").join("&amp;");
+    out = out.split("<").join("&lt;");
+    out = out.split(">").join("&gt;");
+    out = out.split('"').join("&quot;");
+    out = out.split("'").join("&#039;");
+    return out;
   }
-}
-function saveState(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 
-function getNetAnnual(){
-  const s = state.settings;
-  if(s.netMethod === "netAnnual") return Math.max(0, +s.netAnnual || 0);
-  if(s.netMethod === "netMonthly") return Math.max(0, (+s.netMonthly || 0) * 12);
-  // grossTakehome
-  const gross = Math.max(0, +s.grossAnnual || 0);
-  const pct = clamp((+s.takehomePct || 0)/100, 0, 1);
-  return gross * pct;
-}
+  var STORE_KEY = "buybye_free_gbp_v1";
+  var GBP = new Intl.NumberFormat(undefined, { style:"currency", currency:"GBP" });
 
-function sumMonthlyExpenses(){
-  return state.expenses.reduce((a,e)=> a + (Number(e.amountMonthly)||0), 0);
-}
-
-function hourlyNet(){
-  const net = getNetAnnual();
-  const hoursWeek = Math.max(1, +state.settings.hoursWeek || 40);
-  return net / (52 * hoursWeek);
-}
-
-function dailyNet(){
-  const hoursDay = Math.max(1, +state.settings.hoursDay || 8);
-  return hourlyNet() * hoursDay;
-}
-
-function monthlyNet(){
-  return getNetAnnual() / 12;
-}
-
-function monthlySaveCapacity(){
-  // Start with net monthly * saveRate, then subtract fixed expenses
-  const saveRate = clamp((+state.settings.saveRate||0)/100, 0, 1);
-  const base = monthlyNet() * saveRate;
-  const leftover = base - sumMonthlyExpenses();
-  return Math.max(0, leftover);
-}
-
-function formatHoursToHMM(hours){
-  if(!isFinite(hours) || hours <= 0) return "—";
-  const totalMinutes = Math.round(hours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}h ${m}m`;
-}
-
-function formatDays(days){
-  if(!isFinite(days) || days <= 0) return "—";
-  return `${(Math.round(days*10)/10).toLocaleString()}d`;
-}
-
-function formatWeeks(weeks){
-  if(!isFinite(weeks) || weeks <= 0) return "—";
-  return `${(Math.round(weeks*10)/10).toLocaleString()}w`;
-}
-
-function costRating(hoursToEarn){
-  // A simple relative scale based on weekly hours
-  const hw = Math.max(1, +state.settings.hoursWeek || 40);
-  const weeks = hoursToEarn / hw;
-  if(weeks < 0.25) return { label:"Small", cls:"good" };        // < ~1–2 days
-  if(weeks < 1)    return { label:"Medium", cls:"warn" };       // < 1 week
-  if(weeks < 4)    return { label:"Big", cls:"bad" };           // < 1 month
-  return           { label:"Huge", cls:"bad" };
-}
-
-function itemEffectivePriceMonthly(item){
-  // For recurring items, show monthly equivalent
-  const p = Number(item.price)||0;
-  if(item.type === "monthly") return p;
-  if(item.type === "yearly") return p/12;
-  return p; // one-off treated as one-off elsewhere
-}
-
-/* =========================
-   UI bindings
-========================= */
-const el = (id)=>document.getElementById(id);
-
-function syncSettingsToUI(){
-  const s = state.settings;
-  el("netMethod").value = s.netMethod;
-
-  el("netAnnual").value = s.netAnnual;
-  el("grossAnnual").value = s.grossAnnual;
-  el("takehomePct").value = s.takehomePct;
-  el("netMonthly").value = s.netMonthly;
-
-  el("hoursWeek").value = s.hoursWeek;
-  el("daysWeek").value = s.daysWeek;
-  el("hoursDay").value = s.hoursDay;
-  el("saveRate").value = s.saveRate;
-
-  el("netAnnualBox").style.display = (s.netMethod==="netAnnual") ? "" : "none";
-  el("grossTakehomeBox").style.display = (s.netMethod==="grossTakehome") ? "" : "none";
-  el("netMonthlyBox").style.display = (s.netMethod==="netMonthly") ? "" : "none";
-}
-
-function readSettingsFromUI(){
-  state.settings.netMethod = el("netMethod").value;
-
-  state.settings.netAnnual = Number(el("netAnnual").value)||0;
-  state.settings.grossAnnual = Number(el("grossAnnual").value)||0;
-  state.settings.takehomePct = Number(el("takehomePct").value)||0;
-  state.settings.netMonthly = Number(el("netMonthly").value)||0;
-
-  state.settings.hoursWeek = Number(el("hoursWeek").value)||40;
-  state.settings.daysWeek = Number(el("daysWeek").value)||5;
-  state.settings.hoursDay = Number(el("hoursDay").value)||8;
-  state.settings.saveRate = Number(el("saveRate").value)||0;
-
-  saveState();
-  render();
-}
-
-function renderExpenses(){
-  if(state.expenses.length === 0){
-    el("expenseList").innerHTML = `<span class="muted">No recurring expenses added.</span>`;
-    return;
-  }
-  const lines = state.expenses
-    .map(e => `• ${escapeHtml(e.name)} — <b>${£.format(e.amountMonthly)}</b>/mo <span class="muted">(id: ${e.id.slice(-6)})</span>`)
-    .join("<br/>");
-  el("expenseList").innerHTML = lines + `<div class="note" style="margin-top:8px">To remove one expense: click it below in “Opportunity cost”.</div>`;
-}
-
-function renderKpis(){
-  const netA = getNetAnnual();
-  const hNet = hourlyNet();
-  const dNet = dailyNet();
-  const mNet = monthlyNet();
-  const expM = sumMonthlyExpenses();
-  const saveM = monthlySaveCapacity();
-
-  const hw = Math.max(1, +state.settings.hoursWeek || 40);
-  const hoursYear = 52 * hw;
-
-  const text = `
-    <div class="kpi">
-      <div class="big">${£.format(netA)}</div>
-      <div class="small">Net annual pay used for calculations</div>
-    </div>
-    <div class="kpi">
-      <div class="big">${£.format(hNet)} / hour</div>
-      <div class="small">Take-home per work hour (net)</div>
-    </div>
-    <div class="kpi">
-      <div class="big">${£.format(mNet)} / month</div>
-      <div class="small">Net monthly pay</div>
-    </div>
-    <div class="kpi">
-      <div class="big">${£.format(expM)} / month</div>
-      <div class="small">Recurring expenses (you added)</div>
-    </div>
-    <div class="kpi">
-      <div class="big">${£.format(saveM)} / month</div>
-      <div class="small">Estimated monthly saving capacity (after expenses)</div>
-    </div>
-    <div class="kpi">
-      <div class="big">${hoursYear.toLocaleString()} hrs/year</div>
-      <div class="small">Work hours per year (based on your hours/week)</div>
-    </div>
-  `;
-  el("kpis").innerHTML = text;
-}
-
-function currentFilters(){
-  return {
-    sortBy: el("sortBy").value,
-    filterCat: el("filterCat").value,
-    search: (el("search").value||"").trim().toLowerCase()
-  };
-}
-
-function sortItems(items, sortBy){
-  const hNet = hourlyNet();
-  const hw = Math.max(1, +state.settings.hoursWeek || 40);
-
-  const timeHours = (it)=>{
-    const p = Number(it.price)||0;
-    if(hNet<=0) return Infinity;
-    return p / hNet;
+  var defaultState = {
+    settings: {
+      netMethod: "netAnnual",
+      netAnnual: 30000,
+      grossAnnual: 35000,
+      takehomePct: 75,
+      netMonthly: 2500,
+      hoursWeek: 40,
+      daysWeek: 5,
+      hoursDay: 8,
+      saveRate: 20
+    },
+    expenses: [],
+    items: []
   };
 
-  const copy = items.slice();
-  if(sortBy==="recent"){
-    copy.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  }else if(sortBy==="priceDesc"){
-    copy.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0));
-  }else if(sortBy==="priceAsc"){
-    copy.sort((a,b)=>(Number(a.price)||0)-(Number(b.price)||0));
-  }else if(sortBy==="timeDesc"){
-    copy.sort((a,b)=>timeHours(b)-timeHours(a));
-  }else if(sortBy==="timeAsc"){
-    copy.sort((a,b)=>timeHours(a)-timeHours(b));
+  var state = loadState();
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return deepClone(defaultState);
+      var parsed = JSON.parse(raw);
+      return {
+        settings: Object.assign({}, defaultState.settings, parsed.settings || {}),
+        expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+        items: Array.isArray(parsed.items) ? parsed.items : []
+      };
+    }catch(e){
+      return deepClone(defaultState);
+    }
   }
-  return copy;
-}
-
-function renderItems(){
-  const hNet = hourlyNet();
-  const dNet = dailyNet();
-  const hw = Math.max(1, +state.settings.hoursWeek || 40);
-
-  const saveM = monthlySaveCapacity();
-
-  const { sortBy, filterCat, search } = currentFilters();
-
-  let list = state.items.slice();
-
-  if(filterCat !== "all"){
-    list = list.filter(it => it.category === filterCat);
-  }
-  if(search){
-    list = list.filter(it => (
-      (it.name||"").toLowerCase().includes(search) ||
-      (it.notes||"").toLowerCase().includes(search) ||
-      (it.category||"").toLowerCase().includes(search)
-    ));
+  function saveState(){
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
   }
 
-  list = sortItems(list, sortBy);
+  function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
 
-  // Populate filter cats from existing items
-  const cats = Array.from(new Set(state.items.map(i=>i.category))).filter(Boolean).sort();
-  const sel = el("filterCat").value;
-  el("filterCat").innerHTML = `<option value="all">All</option>` + cats.map(c=>`<option>${escapeHtml(c)}</option>`).join("");
-  el("filterCat").value = cats.includes(sel) ? sel : "all";
-
-  if(list.length === 0){
-    el("itemsTbody").innerHTML = `<tr><td colspan="6" class="muted">No items yet. Add one on the left.</td></tr>`;
-    return;
+  function getNetAnnual(){
+    var s = state.settings;
+    if(s.netMethod === "netAnnual") return Math.max(0, Number(s.netAnnual) || 0);
+    if(s.netMethod === "netMonthly") return Math.max(0, (Number(s.netMonthly)||0) * 12);
+    var gross = Math.max(0, Number(s.grossAnnual) || 0);
+    var pct = clamp((Number(s.takehomePct)||0)/100, 0, 1);
+    return gross * pct;
   }
 
-  const rows = list.map(it=>{
-    const price = Number(it.price)||0;
+  function sumMonthlyExpenses(){
+    return state.expenses.reduce(function(a,e){ return a + (Number(e.amountMonthly)||0); }, 0);
+  }
 
-    // Work time (earn time)
-    const hrs = (hNet>0) ? (price / hNet) : Infinity;
-    const days = (dNet>0) ? (price / dNet) : Infinity;
-    const weeks = (hw>0 && isFinite(hrs)) ? (hrs / hw) : Infinity;
+  function hourlyNet(){
+    var net = getNetAnnual();
+    var hoursWeek = Math.max(1, Number(state.settings.hoursWeek) || 40);
+    return net / (52 * hoursWeek);
+  }
 
-    const workTime = isFinite(hrs) ? `${formatHoursToHMM(hrs)} <span class="muted">(${formatDays(days)}, ${formatWeeks(weeks)})</span>` : "—";
+  function dailyNet(){
+    var hoursDay = Math.max(1, Number(state.settings.hoursDay) || 8);
+    return hourlyNet() * hoursDay;
+  }
 
-    // Calendar time if saving
-    // For one-off: months = price / monthlySaveCapacity
-    // For monthly recurring: compare to monthly save capacity (stress test)
-    // For yearly recurring: compare to monthly save capacity too, but price/12 for monthly impact + one-off for annual renewal
-    let cal = "—";
-    if(saveM > 0){
-      if(it.type === "oneoff"){
-        const months = price / saveM;
-        cal = `${(Math.round(months*10)/10).toLocaleString()} mo`;
-      }else if(it.type === "monthly"){
-        const ratio = price / saveM; // "this subscription eats X of your saving capacity"
-        cal = `${(Math.round(ratio*100)/100).toLocaleString()}× of your monthly saving`;
-      }else if(it.type === "yearly"){
-        const months = price / saveM;
-        cal = `${(Math.round(months*10)/10).toLocaleString()} mo (to cover annual)`;
-      }
-    }else{
-      cal = `<span class="bad">No saving capacity set</span>`;
+  function monthlyNet(){ return getNetAnnual()/12; }
+
+  function monthlySaveCapacity(){
+    var saveRate = clamp((Number(state.settings.saveRate)||0)/100, 0, 1);
+    var base = monthlyNet() * saveRate;
+    var leftover = base - sumMonthlyExpenses();
+    return Math.max(0, leftover);
+  }
+
+  function formatHoursToHMM(hours){
+    if(!isFinite(hours) || hours <= 0) return "—";
+    var totalMinutes = Math.round(hours * 60);
+    var h = Math.floor(totalMinutes / 60);
+    var m = totalMinutes % 60;
+    return h + "h " + m + "m";
+  }
+  function formatDays(days){
+    if(!isFinite(days) || days <= 0) return "—";
+    return (Math.round(days*10)/10).toLocaleString() + "d";
+  }
+  function formatWeeks(weeks){
+    if(!isFinite(weeks) || weeks <= 0) return "—";
+    return (Math.round(weeks*10)/10).toLocaleString() + "w";
+  }
+  function costRating(hoursToEarn){
+    var hw = Math.max(1, Number(state.settings.hoursWeek) || 40);
+    var weeks = hoursToEarn / hw;
+    if(weeks < 0.25) return { label:"Small", cls:"good" };
+    if(weeks < 1) return { label:"Medium", cls:"warn" };
+    if(weeks < 4) return { label:"Big", cls:"bad" };
+    return { label:"Huge", cls:"bad" };
+  }
+
+  function syncSettingsToUI(){
+    var s = state.settings;
+
+    $("netMethod").value = s.netMethod;
+    $("netAnnual").value = s.netAnnual;
+    $("grossAnnual").value = s.grossAnnual;
+    $("takehomePct").value = s.takehomePct;
+    $("netMonthly").value = s.netMonthly;
+
+    $("hoursWeek").value = s.hoursWeek;
+    $("daysWeek").value = s.daysWeek;
+    $("hoursDay").value = s.hoursDay;
+    $("saveRate").value = s.saveRate;
+
+    $("netAnnualBox").style.display = (s.netMethod==="netAnnual") ? "" : "none";
+    $("grossTakehomeBox").style.display = (s.netMethod==="grossTakehome") ? "" : "none";
+    $("netMonthlyBox").style.display = (s.netMethod==="netMonthly") ? "" : "none";
+  }
+
+  function readSettingsFromUI(){
+    state.settings.netMethod = $("netMethod").value;
+    state.settings.netAnnual = Number($("netAnnual").value)||0;
+    state.settings.grossAnnual = Number($("grossAnnual").value)||0;
+    state.settings.takehomePct = Number($("takehomePct").value)||0;
+    state.settings.netMonthly = Number($("netMonthly").value)||0;
+
+    state.settings.hoursWeek = Number($("hoursWeek").value)||40;
+    state.settings.daysWeek = Number($("daysWeek").value)||5;
+    state.settings.hoursDay = Number($("hoursDay").value)||8;
+    state.settings.saveRate = Number($("saveRate").value)||0;
+
+    saveState();
+    render();
+  }
+
+  function renderExpenses(){
+    if(state.expenses.length === 0){
+      $("expenseList").innerHTML = '<span class="muted">No recurring expenses added.</span>';
+      return;
+    }
+    $("expenseList").innerHTML = state.expenses.map(function(e){
+      return "• " + escapeHtml(e.name) + " — <b>" + GBP.format(e.amountMonthly) + "</b>/mo";
+    }).join("<br/>");
+  }
+
+  function renderKpis(){
+    var netA = getNetAnnual();
+    var hNet = hourlyNet();
+    var mNet = monthlyNet();
+    var expM = sumMonthlyExpenses();
+    var saveM = monthlySaveCapacity();
+    var hw = Math.max(1, Number(state.settings.hoursWeek) || 40);
+    var hoursYear = 52 * hw;
+
+    $("kpis").innerHTML =
+      '<div class="kpi"><div class="big">'+GBP.format(netA)+'</div><div class="small">Net annual pay used</div></div>'+
+      '<div class="kpi"><div class="big">'+GBP.format(hNet)+' / hour</div><div class="small">Net per work hour</div></div>'+
+      '<div class="kpi"><div class="big">'+GBP.format(mNet)+' / month</div><div class="small">Net monthly</div></div>'+
+      '<div class="kpi"><div class="big">'+GBP.format(expM)+' / month</div><div class="small">Recurring expenses</div></div>'+
+      '<div class="kpi"><div class="big">'+GBP.format(saveM)+' / month</div><div class="small">Saving capacity</div></div>'+
+      '<div class="kpi"><div class="big">'+hoursYear.toLocaleString()+' hrs/year</div><div class="small">Work hours per year</div></div>';
+  }
+
+  function renderItems(){
+    var hNet = hourlyNet();
+    var dNet = dailyNet();
+    var hw = Math.max(1, Number(state.settings.hoursWeek) || 40);
+    var saveM = monthlySaveCapacity();
+
+    if(state.items.length === 0){
+      $("itemsTbody").innerHTML = '<tr><td colspan="6" class="muted">No items yet. Add one on the left.</td></tr>';
+      return;
     }
 
-    const r = costRating(hrs);
+    $("itemsTbody").innerHTML = state.items.map(function(it){
+      var price = Number(it.price)||0;
+      var hrs = (hNet>0) ? (price / hNet) : Infinity;
+      var days = (dNet>0) ? (price / dNet) : Infinity;
+      var weeks = (hw>0 && isFinite(hrs)) ? (hrs / hw) : Infinity;
 
-    const typeTag = it.type === "oneoff" ? "One-off" : (it.type === "monthly" ? "Monthly" : "Yearly");
-    const desc = `
-      <div style="font-weight:800">${escapeHtml(it.name||"Item")}</div>
-      <div class="muted tiny">${escapeHtml(it.category||"Other")} • <span class="tag">${typeTag}</span>${it.notes?` • ${escapeHtml(it.notes)}`:""}</div>
-    `;
+      var cal = "—";
+      if(saveM > 0){
+        if(it.type === "oneoff"){
+          cal = (Math.round((price/saveM)*10)/10).toLocaleString() + " mo";
+        }else if(it.type === "monthly"){
+          cal = (Math.round((price/saveM)*100)/100).toLocaleString() + "× of monthly saving";
+        }else{
+          cal = (Math.round((price/saveM)*10)/10).toLocaleString() + " mo (annual)";
+        }
+      }else{
+        cal = '<span class="bad">No saving capacity set</span>';
+      }
 
-    return `
-      <tr>
-        <td>${desc}</td>
-        <td class="right">${£.format(price)}</td>
-        <td class="right">${workTime}</td>
-        <td class="right">${cal}</td>
-        <td class="right"><span class="${r.cls}">${r.label}</span></td>
-        <td class="right"><button class="btnDanger" data-del="${it.id}">Delete</button></td>
-      </tr>
-    `;
-  }).join("");
+      var r = costRating(hrs);
+      var typeTag = (it.type==="oneoff") ? "One-off" : (it.type==="monthly" ? "Monthly" : "Yearly");
 
-  el("itemsTbody").innerHTML = rows;
+      return ''+
+      '<tr>'+
+        '<td><div style="font-weight:800">'+escapeHtml(it.name)+'</div>'+
+        '<div class="muted tiny">'+escapeHtml(it.category||"Other")+' • <span class="tag">'+typeTag+'</span>'+(it.notes?(' • '+escapeHtml(it.notes)):"")+'</div></td>'+
+        '<td class="right">'+GBP.format(price)+'</td>'+
+        '<td class="right">'+formatHoursToHMM(hrs)+' <span class="muted">('+formatDays(days)+', '+formatWeeks(weeks)+')</span></td>'+
+        '<td class="right">'+cal+'</td>'+
+        '<td class="right"><span class="'+r.cls+'">'+r.label+'</span></td>'+
+        '<td class="right"><button class="btnDanger" type="button" data-del="'+it.id+'">Delete</button></td>'+
+      '</tr>';
+    }).join("");
 
-  // wire delete buttons
-  el("itemsTbody").querySelectorAll("button[data-del]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const id = btn.getAttribute("data-del");
-      state.items = state.items.filter(i=>i.id !== id);
-      saveState();
-      render();
+    Array.prototype.forEach.call($("itemsTbody").querySelectorAll("button[data-del]"), function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-del");
+        state.items = state.items.filter(function(i){ return i.id !== id; });
+        saveState();
+        render();
+      });
     });
-  });
-}
-
-function renderOpportunityCost(){
-  const exp = state.expenses.slice().sort((a,b)=>(Number(b.amountMonthly)||0)-(Number(a.amountMonthly)||0));
-  if(exp.length === 0){
-    el("oppCost").innerHTML = `<div class="muted">Add some monthly expenses on the left (rent, bills, subscriptions) to see comparisons.</div>`;
-    return;
   }
 
-  // Use the most expensive recent/visible item as the comparison target, otherwise newest item
-  const { filterCat, search } = currentFilters();
-  let items = state.items.slice();
-  if(filterCat !== "all") items = items.filter(it=>it.category===filterCat);
-  if(search) items = items.filter(it => ((it.name||"").toLowerCase().includes(search) || (it.notes||"").toLowerCase().includes(search)));
-  items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const target = items[0] || state.items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
-
-  if(!target){
-    el("oppCost").innerHTML = `<div class="muted">Add at least one item to see opportunity cost comparisons.</div>`;
-    return;
+  function render(){
+    syncSettingsToUI();
+    renderExpenses();
+    renderKpis();
+    renderItems();
   }
 
-  const targetPrice = Number(target.price)||0;
-  const lines = exp.map(e=>{
-    const amt = Number(e.amountMonthly)||0;
-    if(amt <= 0) return "";
-    const x = targetPrice / amt;
-    return `
-      <div class="split" style="margin:8px 0">
-        <div>
-          <b>${escapeHtml(e.name)}</b> <span class="muted">(${£.format(amt)}/mo)</span>
-          <div class="muted tiny">Click to remove expense</div>
-        </div>
-        <div class="right">
-          <div><b>${(Math.round(x*10)/10).toLocaleString()}</b> months of this expense</div>
-        </div>
-        <div class="right" style="min-width:110px">
-          <button class="btnDanger" data-expdel="${e.id}">Remove</button>
-        </div>
-      </div>
-    `;
-  }).join("");
+  function addItem(){
+    // PROOF it's wired:
+    // alert("Add item clicked"); // (leave off unless you want to test)
+    var name = ($("itemName").value||"").trim();
+    var price = Number($("itemPrice").value||0);
+    var category = $("itemCategory").value;
+    var type = $("itemType").value;
+    var notes = ($("itemNotes").value||"").trim();
 
-  el("oppCost").innerHTML = `
-    <div class="note">
-      Comparing <b>${escapeHtml(target.name)}</b> (${£.format(targetPrice)}) to your monthly expenses:
-    </div>
-    <div style="margin-top:10px">${lines || "<span class='muted'>No valid expense amounts.</span>"}</div>
-  `;
-
-  el("oppCost").querySelectorAll("button[data-expdel]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const id = btn.getAttribute("data-expdel");
-      state.expenses = state.expenses.filter(e=>e.id !== id);
-      saveState();
-      render();
+    if(!name || !isFinite(price) || price <= 0){
+      alert("Please enter an item name and a valid price.");
+      return;
+    }
+    state.items.unshift({
+      id: (Math.random().toString(16).slice(2) + Date.now().toString(16)),
+      name: name,
+      price: price,
+      category: category,
+      type: type,
+      notes: notes,
+      createdAt: Date.now()
     });
-  });
-}
 
-function escapeHtml(s){
-  let out = String(s || "");
-  out = out.split("&").join("&amp;");
-  out = out.split("<").join("&lt;");
-  out = out.split(">").join("&gt;");
-  out = out.split('"').join("&quot;");
-  out = out.split("'").join("&#039;");
-  return out;
-}
+    $("itemName").value = "";
+    $("itemPrice").value = "";
+    $("itemNotes").value = "";
 
-/* =========================
-   Actions
-========================= */
-function addItem(){
-  const name = (el("itemName").value||"").trim();
-  const price = Number(el("itemPrice").value||0);
-  const category = el("itemCategory").value;
-  const type = el("itemType").value;
-  const notes = (el("itemNotes").value||"").trim();
-
-  if(!name || !isFinite(price) || price <= 0){
-    alert("Please enter an item name and a valid price.");
-    return;
+    saveState();
+    render();
   }
-  state.items.unshift({
-    id: uid(),
-    name,
-    price,
-    category,
-    type,
-    notes,
-    createdAt: Date.now()
-  });
-  el("itemName").value = "";
-  el("itemPrice").value = "";
-  el("itemNotes").value = "";
-  saveState();
-  render();
-}
 
-function addExpense(){
-  const name = (el("expName").value||"").trim();
-  const amt = Number(el("expAmount").value||0);
-  if(!name || !isFinite(amt) || amt <= 0){
-    alert("Enter an expense name and a valid monthly amount.");
-    return;
+  function addExpense(){
+    var name = ($("expName").value||"").trim();
+    var amt = Number($("expAmount").value||0);
+    if(!name || !isFinite(amt) || amt <= 0){
+      alert("Enter an expense name and a valid monthly amount.");
+      return;
+    }
+    state.expenses.unshift({ id: (Math.random().toString(16).slice(2) + Date.now().toString(16)), name: name, amountMonthly: amt });
+    $("expName").value = "";
+    $("expAmount").value = "";
+    saveState();
+    render();
   }
-  state.expenses.unshift({ id: uid(), name, amountMonthly: amt });
-  el("expName").value = "";
-  el("expAmount").value = "";
-  saveState();
-  render();
-}
 
-/* =========================
-   Render
-========================= */
-function render(){
-  syncSettingsToUI();
-  renderExpenses();
-  renderKpis();
-  renderItems();
-  renderOpportunityCost();
-}
+  function wire(){
+    // Settings changes
+    ["netMethod","netAnnual","grossAnnual","takehomePct","netMonthly","hoursWeek","daysWeek","hoursDay","saveRate"].forEach(function(id){
+      $(id).addEventListener("input", readSettingsFromUI);
+      $(id).addEventListener("change", readSettingsFromUI);
+    });
 
-/* =========================
-   Wire events
-========================= */
-["netMethod","netAnnual","grossAnnual","takehomePct","netMonthly","hoursWeek","daysWeek","hoursDay","saveRate"].forEach(id=>{
-  el(id).addEventListener("input", readSettingsFromUI);
-  el(id).addEventListener("change", readSettingsFromUI);
-});
+    // Buttons
+    $("addItemBtn").addEventListener("click", addItem);
+    $("addExpenseBtn").addEventListener("click", addExpense);
 
-el("addItemBtn").addEventListener("click", addItem);
-el("clearItemsBtn").addEventListener("click", ()=>{
-  if(confirm("Clear ALL items?")){ state.items = []; saveState(); render(); }
-});
+    $("clearItemsBtn").addEventListener("click", function(){
+      if(confirm("Clear ALL items?")){ state.items = []; saveState(); render(); }
+    });
+    $("clearExpensesBtn").addEventListener("click", function(){
+      if(confirm("Clear ALL expenses?")){ state.expenses = []; saveState(); render(); }
+    });
 
-el("addExpenseBtn").addEventListener("click", addExpense);
-el("clearExpensesBtn").addEventListener("click", ()=>{
-  if(confirm("Clear ALL expenses?")){ state.expenses = []; saveState(); render(); }
-});
+    render();
+  }
 
-["sortBy","filterCat","search"].forEach(id=>{
-  el(id).addEventListener("input", render);
-  el(id).addEventListener("change", render);
-});
-
-// enter-to-add UX
-el("itemPrice").addEventListener("keydown", (e)=>{ if(e.key==="Enter") addItem(); });
-el("expAmount").addEventListener("keydown", (e)=>{ if(e.key==="Enter") addExpense(); });
-
-/* =========================
-   Boot
-========================= */
-render();
+  document.addEventListener("DOMContentLoaded", function(){
+    // Ensure the IDs exist; if not, you'll get a popup error now.
+    wire();
+  });
+})();
 </script>
 </body>
 </html>
+
 
